@@ -6,7 +6,7 @@
 # registry source as appropriate.
 
 name: batch-inference
-region: nyc
+region: blr
 
 services:
   - name: api
@@ -14,9 +14,9 @@ services:
     instance_count: 1
 
     github:
-      repo: your-org/batch-inference
+      repo: Faiz-Mohd/batch_inference.
       branch: main
-      deploy_on_push: true
+      deploy_on_push: false
 
     dockerfile_path: Dockerfile
     http_port: 8080
@@ -46,6 +46,6 @@ services:
 databases:
   - name: db
     engine: PG
-    version: "16"
+    version: "18"
     production: true
-    cluster_name: batch-inference-db
+    cluster_name: db-pgsql-blr1-80904
