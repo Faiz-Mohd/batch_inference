@@ -14,7 +14,7 @@ services:
     instance_count: 1
 
     github:
-      repo: Faiz-Mohd/batch_inference.
+      repo: Faiz-Mohd/batch_inference
       branch: main
       deploy_on_push: false
 
