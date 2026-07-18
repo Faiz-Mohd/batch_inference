@@ -35,7 +35,7 @@ safely.
 
 ```
 cmd/server/            entrypoint, DI wiring, graceful shutdown
-internal/config/       env-driven configuration
+internal/config/       configuration (env essentials + config.yaml tuning)
 internal/domain/       core types + typed retryable errors (no deps)
 internal/logging/      structured slog logger + context helpers
 internal/handler/      gin HTTP layer, middleware, DTOs, mock endpoint
@@ -64,7 +64,28 @@ Returns `202 Accepted` immediately after validation:
 { "batch_id": "b1f2...", "accepted": 2, "status": "pending" }
 ```
 
-Validation errors return `400` with `{ "error": "..." }`.
+Validation errors return `400` with `{ "error": "..." }`; bodies larger than the
+configured limit return `413`.
+
+### `GET /v1/batches/{id}`
+
+Returns the batch status with live per-prompt counts, and the aggregated result
+document once the batch completes:
+
+```json
+{
+  "batch_id": "b1f2...",
+  "status": "completed",
+  "total": 3,
+  "succeeded": 3,
+  "failed": 0,
+  "created_at": "2026-07-18T06:00:00Z",
+  "completed_at": "2026-07-18T06:00:05Z",
+  "result": { "batch_id": "b1f2...", "results": ["..."] }
+}
+```
+
+Unknown IDs return `404`; malformed IDs return `400`.
 
 ### `GET /healthz`
 
@@ -145,7 +166,8 @@ Configuration is split in two:
 Structured JSON logs via `slog`. Every HTTP request gets a `request_id`
 (honoring an inbound `X-Request-ID`), and that logger is propagated through the
 context so worker/service logs carry `batch_id`, `prompt_id`, `attempt`, and
-`worker_id` for easy debugging. Set `LOG_FORMAT=text` for readable local logs.
+`worker_id` for easy debugging. Set `logging.format: text` in `config.yaml` for
+readable local logs.
 
 ## Deployment (DigitalOcean App Platform)
 
@@ -160,8 +182,6 @@ Update the `github.repo`/`branch` in the spec to point at your repository.
 
 ## Notes / future work
 
-- A batch status API (`GET /v1/batches/{id}` reporting e.g. `100/400 completed`)
-  is intentionally deferred; the schema already tracks per-status counts.
 - If aggregated results grow very large, swap the `batches.result` jsonb write
   for an object-storage (Spaces) pointer -- the aggregator is isolated for this.
 ```

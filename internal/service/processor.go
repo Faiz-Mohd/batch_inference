@@ -77,12 +77,6 @@ func (p *Processor) dispatch(ctx context.Context, jobs chan<- domain.Prompt) {
 	defer ticker.Stop()
 
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
 		claimed, err := p.prompts.Claim(ctx, p.cfg.ClaimBatch)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -150,33 +144,20 @@ func (p *Processor) process(ctx context.Context, workerID int, prompt domain.Pro
 func (p *Processor) handleFailure(ctx context.Context, logger *slog.Logger, prompt domain.Prompt, err error) {
 	re, retryable := domain.AsRetryable(err)
 
-	// Rate limiting (429) is not the prompt's fault: requeue with backoff and do
-	// NOT consume the retry budget, so throttling never drops a prompt.
-	if retryable && re.RateLimited {
+	// Rate limiting (429) is not the prompt's fault, so it never consumes the
+	// retry budget; genuine transient errors (5xx / transport) retry until the
+	// budget is spent.
+	rateLimited := retryable && re.RateLimited
+	if rateLimited || (retryable && prompt.Attempts < prompt.MaxAttempts) {
 		delay := backoff(prompt.Attempts, p.cfg.BaseBackoff, p.cfg.MaxBackoff, re.RetryAfter)
 		next := time.Now().Add(delay)
-		if rerr := p.prompts.RequeueThrottled(ctx, prompt.ID, next, err.Error()); rerr != nil {
-			logger.Error("failed to requeue throttled prompt", "err", rerr)
-			return
-		}
-		logger.Warn("prompt throttled, requeued (attempt not consumed)",
-			"err", err,
-			"delay_ms", delay.Milliseconds(),
-			"next_retry_at", next.UTC(),
-		)
-		return
-	}
-
-	// Genuine transient error (5xx / transport): retry until the budget is spent.
-	if retryable && prompt.Attempts < prompt.MaxAttempts {
-		delay := backoff(prompt.Attempts, p.cfg.BaseBackoff, p.cfg.MaxBackoff, re.RetryAfter)
-		next := time.Now().Add(delay)
-		if rerr := p.prompts.Retry(ctx, prompt.ID, next, err.Error()); rerr != nil {
+		if rerr := p.prompts.Requeue(ctx, prompt.ID, next, err.Error(), !rateLimited); rerr != nil {
 			logger.Error("failed to requeue prompt", "err", rerr)
 			return
 		}
 		logger.Warn("prompt requeued for retry",
 			"err", err,
+			"rate_limited", rateLimited,
 			"delay_ms", delay.Milliseconds(),
 			"next_retry_at", next.UTC(),
 			"max_attempts", prompt.MaxAttempts,

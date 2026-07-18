@@ -1,19 +1,34 @@
 package handler
 
-import "github.com/google/uuid"
+import (
+	"encoding/json"
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // createBatchRequest is the accepted request body: a JSON array of prompt
 // strings, e.g. ["prompt one", "prompt two"].
 type createBatchRequest []string
-
-// Prompts returns the request as a plain string slice.
-func (r createBatchRequest) Prompts() []string { return r }
 
 // createBatchResponse is the immediate ack returned after validation.
 type createBatchResponse struct {
 	BatchID  uuid.UUID `json:"batch_id"`
 	Accepted int       `json:"accepted"`
 	Status   string    `json:"status"`
+}
+
+// batchStatusResponse reports a batch's progress and, once completed, its
+// aggregated result.
+type batchStatusResponse struct {
+	BatchID     uuid.UUID       `json:"batch_id"`
+	Status      string          `json:"status"`
+	Total       int             `json:"total"`
+	Succeeded   int             `json:"succeeded"`
+	Failed      int             `json:"failed"`
+	CreatedAt   time.Time       `json:"created_at"`
+	CompletedAt *time.Time      `json:"completed_at,omitempty"`
+	Result      json.RawMessage `json:"result,omitempty"`
 }
 
 // errorResponse is the standard error envelope.

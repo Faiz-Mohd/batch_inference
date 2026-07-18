@@ -56,6 +56,20 @@ func (s *BatchService) CreateBatch(ctx context.Context, prompts []string) (*doma
 	return batch, nil
 }
 
+// GetBatch returns a batch with its live prompt counts. A nil batch (and nil
+// error) means the ID is unknown.
+func (s *BatchService) GetBatch(ctx context.Context, id uuid.UUID) (*domain.Batch, domain.BatchCounts, error) {
+	batch, err := s.batches.Get(ctx, id)
+	if err != nil || batch == nil {
+		return nil, domain.BatchCounts{}, err
+	}
+	counts, err := s.batches.Counts(ctx, id)
+	if err != nil {
+		return nil, domain.BatchCounts{}, err
+	}
+	return batch, counts, nil
+}
+
 func (s *BatchService) validate(prompts []string) ([]string, error) {
 	if len(prompts) == 0 {
 		return nil, domain.ErrEmptyBatch
