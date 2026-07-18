@@ -32,6 +32,7 @@ func (r Router) Build() *gin.Engine {
 
 	v1 := engine.Group("/v1")
 	v1.POST("/batches", r.Batch.Create)
+	v1.GET("/batches/:id", r.Batch.Get)
 
 	if r.Mock != nil {
 		engine.POST("/mock/infer", r.Mock.Infer)

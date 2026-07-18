@@ -73,38 +73,25 @@ func (r *PromptRepository) Succeed(ctx context.Context, id uuid.UUID, response s
 	return nil
 }
 
-// Retry reschedules a prompt back to 'pending' with a future next_retry_at.
+// Requeue reschedules a prompt back to 'pending' with a future next_retry_at.
 // The durable timestamp is how backoff survives restarts.
-func (r *PromptRepository) Retry(ctx context.Context, id uuid.UUID, nextRetryAt time.Time, lastErr string) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE prompts
-		SET status = 'pending', next_retry_at = $2, error = $3, updated_at = now()
-		WHERE id = $1`,
-		id, nextRetryAt, lastErr,
-	)
-	if err != nil {
-		return fmt.Errorf("mark for retry: %w", err)
-	}
-	return nil
-}
-
-// RequeueThrottled reschedules a rate-limited (429) prompt back to 'pending'
-// without consuming the retry budget: it decrements attempts to cancel out the
-// increment applied when the prompt was claimed. This ensures throttling never
-// causes a prompt to be dropped.
-func (r *PromptRepository) RequeueThrottled(ctx context.Context, id uuid.UUID, nextRetryAt time.Time, lastErr string) error {
+//
+// When consumeAttempt is false (rate-limited / 429), attempts is decremented to
+// cancel out the increment applied when the prompt was claimed, so throttling
+// never eats the retry budget and never drops a prompt.
+func (r *PromptRepository) Requeue(ctx context.Context, id uuid.UUID, nextRetryAt time.Time, lastErr string, consumeAttempt bool) error {
 	_, err := r.pool.Exec(ctx, `
 		UPDATE prompts
 		SET status = 'pending',
 		    next_retry_at = $2,
 		    error = $3,
-		    attempts = GREATEST(attempts - 1, 0),
+		    attempts = CASE WHEN $4 THEN attempts ELSE GREATEST(attempts - 1, 0) END,
 		    updated_at = now()
 		WHERE id = $1`,
-		id, nextRetryAt, lastErr,
+		id, nextRetryAt, lastErr, consumeAttempt,
 	)
 	if err != nil {
-		return fmt.Errorf("requeue throttled: %w", err)
+		return fmt.Errorf("requeue prompt: %w", err)
 	}
 	return nil
 }

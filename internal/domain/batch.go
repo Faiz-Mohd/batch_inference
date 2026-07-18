@@ -11,9 +11,8 @@ import (
 type BatchStatus string
 
 const (
-	BatchPending    BatchStatus = "pending"
-	BatchProcessing BatchStatus = "processing"
-	BatchCompleted  BatchStatus = "completed"
+	BatchPending   BatchStatus = "pending"
+	BatchCompleted BatchStatus = "completed"
 )
 
 // Batch is a group of prompts submitted together.
