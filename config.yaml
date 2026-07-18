@@ -1,0 +1,37 @@
+# Service tuning configuration.
+#
+# Only DATABASE_URL and PORT come from the environment (secret / platform).
+# Everything below is loaded at startup from this file. Override the file path
+# with the CONFIG_PATH environment variable. Any key omitted here falls back to
+# the built-in default.
+
+worker:
+  pool_size: 8            # bounded concurrent workers
+  claim_batch_size: 8     # prompts claimed from the queue per poll
+  poll_interval: 500ms    # idle dispatcher poll interval
+
+retry:
+  max_attempts: 5         # attempts before a prompt is marked failed
+  base_backoff: 250ms     # base for exponential backoff
+  max_backoff: 30s        # backoff ceiling
+
+validation:
+  max_batch_size: 10000   # max prompts per request
+  max_prompt_len: 8192    # max characters per prompt
+
+inference:
+  url: "http://localhost:8080/mock/infer"
+  request_timeout: 10s
+
+mock:
+  rate_per_sec: 20        # token-bucket refill rate
+  burst: 10               # token-bucket size
+  fail_rate: 0.05         # probability of an injected 5xx
+  max_latency: 100ms      # max simulated processing latency
+
+logging:
+  level: info             # debug | info | warn | error
+  format: json            # json (prod) | text (dev)
+
+lifecycle:
+  shutdown_timeout: 20s

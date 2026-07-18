@@ -1,0 +1,36 @@
+# Local development stack: the service plus a Postgres database.
+# Mirrors production (App Platform + Managed Postgres) closely enough for
+# end-to-end testing on a laptop.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: batch
+      POSTGRES_PASSWORD: batch
+      POSTGRES_DB: batch
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U batch"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    # Only essentials come from the environment; tuning lives in config.yaml
+    # (baked into the image at /config.yaml).
+    environment:
+      PORT: "8080"
+      DATABASE_URL: "postgres://batch:batch@db:5432/batch?sslmode=disable"
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:

@@ -1,0 +1,51 @@
+# DigitalOcean App Platform spec.
+# Deploy with: doctl apps create --spec .do/app.yaml
+# (or update:  doctl apps update <app-id> --spec .do/app.yaml)
+#
+# Replace the `github` block with your repo, or use `dockerfile_path` with a
+# registry source as appropriate.
+
+name: batch-inference
+region: nyc
+
+services:
+  - name: api
+    instance_size_slug: basic-xxs
+    instance_count: 1
+
+    github:
+      repo: your-org/batch-inference
+      branch: main
+      deploy_on_push: true
+
+    dockerfile_path: Dockerfile
+    http_port: 8080
+
+    health_check:
+      http_path: /healthz
+      initial_delay_seconds: 10
+      period_seconds: 10
+      failure_threshold: 3
+
+    # Only essentials in env; tuning parameters are read from config.yaml
+    # (baked into the image, CONFIG_PATH=/config.yaml). PORT is injected by
+    # the platform.
+    envs:
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${db.DATABASE_URL}
+
+# DigitalOcean Managed Postgres.
+#
+# `name: db` is the binding alias used by ${db.DATABASE_URL} above; App Platform
+# injects the full connection string (including ?sslmode=require) and adds this
+# app to the database's trusted sources automatically.
+#
+# To attach an EXISTING managed cluster, set production: true and cluster_name
+# to the cluster's name (as shown in the DO console / `doctl databases list`).
+databases:
+  - name: db
+    engine: PG
+    version: "16"
+    production: true
+    cluster_name: batch-inference-db
